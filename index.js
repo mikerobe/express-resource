@@ -64,6 +64,16 @@ function Resource(name, actions, app) {
     if (actions[key]) this.mapDefaultAction(key, actions[key]);
   }
 
+  // custom actions nested in get, put, etc.
+  for (var i = 0, method, key; i < methods.length; ++i) {
+    method = methods[i];
+    if (actions[method]) {
+        for (key in actions[method]) {
+            this.map(method, key, actions[method][key]);
+        }
+    }
+  }
+
   // auto-loader
   if (actions.load) this.load(actions.load);
 };
@@ -129,7 +139,7 @@ Resource.prototype.map = function(method, path, fn){
   var self = this
     , orig = path;
 
-  if (method instanceof Resource) return this.add(method);
+  if (method instanceof Resource) throw new Error('Use the #resource method instead.');
   if ('function' == typeof path) fn = path, path = '';
   if ('object' == typeof path) fn = path, path = '';
   if ('/' == path[0]) path = path.substr(1);
@@ -171,39 +181,15 @@ Resource.prototype.map = function(method, path, fn){
 /**
  * Nest the given `resource`.
  *
- * @param {Resource} resource
- * @return {Resource} for chaining
- * @see Resource#map()
  * @api public
  */
 
-Resource.prototype.add = function(resource){
-  var app = this.app
-    , routes
-    , route;
-
-  // relative base
-  resource.base = this.base
-    + (this.name ? this.name + '/': '')
-    + this.param + '/';
-
-  // re-define previous actions
-  for (var method in resource.routes) {
-    routes = resource.routes[method];
-    for (var key in routes) {
-      route = routes[key];
-      delete routes[key];
-      if (method == 'del') method = 'delete';
-      app.routes[method].forEach(function(route, i){
-        if (route.path == key) {
-          app.routes[method].splice(i, 1);
-        }
-      })
-      resource.map(route.method, route.orig, route.fn);
-    }
-  }
-
-  return this;
+Resource.prototype.resource = function (name, actions, opts) {
+    actions.base = this.base
+        + (this.name ? this.name + '/': '')
+        + this.param + '/'
+        + (actions.base || '');
+    return this.app.resource(name, actions, opts);
 };
 
 /**
